@@ -88,7 +88,7 @@ export function ShadowDuel({ gameId, onBack }: ShadowDuelProps) {
   };
 
   const handleCreateGame = async () => {
-    if (!publicKey || !signTransaction) return;
+    if (!publicKey) return;
     setError('');
     setIsProcessing(true);
     
@@ -99,14 +99,21 @@ export function ShadowDuel({ gameId, onBack }: ShadowDuelProps) {
         return;
       }
 
-      // Create stake transaction (proof of stake)
-      const tx = await createStakeTransaction(connection, publicKey, stakeAmount);
-      const signed = await signTransaction(tx);
-      const sig = await connection.sendRawTransaction(signed.serialize());
-      
-      // Create game
+      // Create game (stake transaction is optional on devnet)
       const newGame = createGame(publicKey.toString(), stakeAmount);
-      updateGameTx(newGame.id, 'createTx', sig);
+      
+      // Try to create stake transaction, but don't fail if wallet has no SOL
+      if (signTransaction) {
+        try {
+          const tx = await createStakeTransaction(connection, publicKey, stakeAmount);
+          const signed = await signTransaction(tx);
+          const sig = await connection.sendRawTransaction(signed.serialize());
+          updateGameTx(newGame.id, 'createTx', sig);
+        } catch (txError: any) {
+          console.log('Stake tx skipped (devnet demo mode):', txError.message);
+          // Continue without stake tx - this is fine for demo
+        }
+      }
       
       setGame(newGame);
       setIsCreating(false);
@@ -118,23 +125,29 @@ export function ShadowDuel({ gameId, onBack }: ShadowDuelProps) {
   };
 
   const handleJoinGame = async () => {
-    if (!publicKey || !signTransaction || !game) return;
+    if (!publicKey || !game) return;
     setError('');
     setIsProcessing(true);
 
     try {
-      // Create stake transaction
-      const tx = await createStakeTransaction(connection, publicKey, game.stake);
-      const signed = await signTransaction(tx);
-      const sig = await connection.sendRawTransaction(signed.serialize());
-
       const updatedGame = joinGame(game.id, publicKey.toString());
       if (!updatedGame) {
         setError('Failed to join game');
         return;
       }
       
-      updateGameTx(game.id, 'joinTx', sig);
+      // Try stake transaction but don't fail if wallet has no SOL
+      if (signTransaction) {
+        try {
+          const tx = await createStakeTransaction(connection, publicKey, game.stake);
+          const signed = await signTransaction(tx);
+          const sig = await connection.sendRawTransaction(signed.serialize());
+          updateGameTx(game.id, 'joinTx', sig);
+        } catch (txError: any) {
+          console.log('Stake tx skipped (devnet demo mode):', txError.message);
+        }
+      }
+      
       setGame(updatedGame);
     } catch (e: any) {
       setError(e.message || 'Failed to join game');
