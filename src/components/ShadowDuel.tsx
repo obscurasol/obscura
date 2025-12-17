@@ -16,7 +16,7 @@ import {
   generateSecret,
   createCommitment,
   createStakeTransaction,
-  updateGameTx
+  updateGameTx,
 } from '@/lib/games';
 
 interface ShadowDuelProps {
@@ -42,7 +42,12 @@ export function ShadowDuel({ gameId, onBack }: ShadowDuelProps) {
   useEffect(() => {
     if (gameId) {
       const existingGame = getGame(gameId);
-      setGame(existingGame);
+      if (existingGame) {
+        setGame(existingGame);
+      } else {
+        // Game doesn't exist locally - show join prompt
+        setGame(null);
+      }
       setIsCreating(false);
     }
     
@@ -283,6 +288,95 @@ export function ShadowDuel({ gameId, onBack }: ShadowDuelProps) {
             {isProcessing ? 'Creating...' : 'Create Duel'}
           </button>
         </div>
+      </div>
+    );
+  }
+
+  // Game not found locally - show join interface for games from other browsers
+  if (!game && gameId) {
+    return (
+      <div className="border border-stone-700 bg-stone-900/50 p-8">
+        <button 
+          onClick={onBack}
+          className="text-stone-500 hover:text-stone-300 font-mono text-sm mb-6"
+        >
+          &lt;- Back to Lobby
+        </button>
+        
+        <h2 className="font-serif text-2xl text-stone-100 mb-4">Join Game</h2>
+        <p className="text-stone-500 font-mono text-xs mb-6 break-all">ID: {gameId}</p>
+        
+        <div className="border border-yellow-900/50 bg-yellow-900/20 p-4 mb-6">
+          <p className="text-yellow-400 font-mono text-sm">
+            This game was created in another browser. Enter the stake amount to join.
+          </p>
+        </div>
+
+        <div className="mb-6">
+          <label className="block text-stone-400 font-mono text-sm mb-2">
+            Stake Amount (SOL) - must match creator's stake
+          </label>
+          <input
+            type="number"
+            value={stake}
+            onChange={(e) => setStake(e.target.value)}
+            step="0.01"
+            min="0.001"
+            className="w-full bg-stone-800 border border-stone-600 px-4 py-3 text-stone-100 font-mono focus:border-stone-400 focus:outline-none"
+            placeholder="0.01"
+          />
+        </div>
+
+        {error && <p className="text-red-400 font-mono text-sm mb-4">{error}</p>}
+
+        <button
+          onClick={async () => {
+            if (!publicKey || !signTransaction) return;
+            setIsProcessing(true);
+            setError('');
+            
+            try {
+              const stakeAmount = parseStake(stake);
+              
+              // Create local copy of the game as opponent
+              const newGame: ShadowDuelGame = {
+                id: gameId,
+                creator: 'unknown', // We don't know the creator's address
+                opponent: publicKey.toString(),
+                stake: stakeAmount,
+                escrowAddress: '',
+                creatorCommit: null,
+                opponentCommit: null,
+                creatorReveal: null,
+                opponentReveal: null,
+                currentRound: 0,
+                revealedRounds: [],
+                winner: null,
+                status: 'committing',
+                createdAt: Date.now(),
+                createTx: null,
+                joinTx: null,
+                payoutTx: null,
+              };
+              
+              // Save to localStorage
+              const stored = localStorage.getItem('obscura_shadow_duel_games');
+              const games = stored ? JSON.parse(stored) : {};
+              games[gameId] = newGame;
+              localStorage.setItem('obscura_shadow_duel_games', JSON.stringify(games));
+              
+              setGame(newGame);
+            } catch (e: any) {
+              setError(e.message || 'Failed to join');
+            } finally {
+              setIsProcessing(false);
+            }
+          }}
+          disabled={isProcessing || !publicKey}
+          className="w-full bg-stone-100 text-stone-900 py-3 font-mono hover:bg-stone-200 transition-colors disabled:opacity-50"
+        >
+          {isProcessing ? 'Joining...' : 'Join This Duel'}
+        </button>
       </div>
     );
   }

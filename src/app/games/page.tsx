@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { ShadowDuel } from '@/components/ShadowDuel';
-import { getOpenGames, getPlayerGames, formatStake, shortenAddress, GameLobbyItem, ShadowDuelGame } from '@/lib/games';
+import { getOpenGames, getPlayerGames, getGame, formatStake, shortenAddress, GameLobbyItem, ShadowDuelGame } from '@/lib/games';
 
 export default function GamesPage() {
   const { publicKey } = useWallet();
@@ -12,12 +12,26 @@ export default function GamesPage() {
   const [selectedGameId, setSelectedGameId] = useState<string | undefined>();
   const [openGames, setOpenGames] = useState<GameLobbyItem[]>([]);
   const [myGames, setMyGames] = useState<ShadowDuelGame[]>([]);
+  const [joinId, setJoinId] = useState('');
+  const [joinError, setJoinError] = useState('');
 
   useEffect(() => {
     refreshGames();
     const interval = setInterval(refreshGames, 3000);
     return () => clearInterval(interval);
+    
   }, [publicKey]);
+
+  // Check URL for game ID on load
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const gameId = params.get('join');
+      if (gameId) {
+        handleJoinById(gameId);
+      }
+    }
+  }, []);
 
   const refreshGames = () => {
     setOpenGames(getOpenGames());
@@ -40,6 +54,30 @@ export default function GamesPage() {
     setView('lobby');
     setSelectedGameId(undefined);
     refreshGames();
+    // Clear URL params
+    if (typeof window !== 'undefined') {
+      window.history.replaceState({}, '', '/games');
+    }
+  };
+
+  const handleJoinById = (id: string) => {
+    setJoinError('');
+    const trimmedId = id.trim();
+    if (!trimmedId) {
+      setJoinError('Please enter a game ID');
+      return;
+    }
+    
+    // Try to get the game (it might exist in another browser's localStorage)
+    // For now, we'll navigate to the game and let ShadowDuel handle it
+    setSelectedGameId(trimmedId);
+    setView('game');
+  };
+
+  const copyGameLink = (gameId: string) => {
+    const link = `${window.location.origin}/games?join=${gameId}`;
+    navigator.clipboard.writeText(link);
+    alert('Game link copied! Share it with your opponent.');
   };
 
   return (
@@ -115,10 +153,43 @@ export default function GamesPage() {
             {publicKey && (
               <button
                 onClick={handleCreateGame}
-                className="w-full bg-stone-100 text-stone-900 py-4 font-mono text-lg hover:bg-stone-200 transition-colors mb-8"
+                className="w-full bg-stone-100 text-stone-900 py-4 font-mono text-lg hover:bg-stone-200 transition-colors mb-4"
               >
                 Create New Duel
               </button>
+            )}
+
+            {/* Join by ID */}
+            {publicKey && (
+              <div className="border border-stone-700 bg-stone-900/50 p-4 mb-8">
+                <p className="text-stone-400 font-mono text-sm mb-3">Join Existing Duel</p>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={joinId}
+                    onChange={(e) => setJoinId(e.target.value)}
+                    placeholder="Paste game ID or link..."
+                    className="flex-1 bg-stone-800 border border-stone-600 px-3 py-2 text-stone-100 font-mono text-sm focus:border-stone-400 focus:outline-none"
+                  />
+                  <button
+                    onClick={() => {
+                      // Extract ID from link if needed
+                      let id = joinId;
+                      if (joinId.includes('join=')) {
+                        const match = joinId.match(/join=([^&]+)/);
+                        if (match) id = match[1];
+                      }
+                      handleJoinById(id);
+                    }}
+                    className="bg-stone-700 text-stone-100 px-4 py-2 font-mono text-sm hover:bg-stone-600 transition-colors"
+                  >
+                    Join
+                  </button>
+                </div>
+                {joinError && (
+                  <p className="text-red-400 font-mono text-xs mt-2">{joinError}</p>
+                )}
+              </div>
             )}
 
             {/* My Active Games */}
@@ -127,29 +198,54 @@ export default function GamesPage() {
                 <h2 className="font-serif text-xl text-stone-100 mb-4">My Games</h2>
                 <div className="space-y-3">
                   {myGames.filter(g => g.status !== 'completed').map((game) => (
-                    <button
+                    <div
                       key={game.id}
-                      onClick={() => handleSelectGame(game.id)}
-                      className="w-full border border-stone-600 bg-stone-800/50 p-4 text-left hover:border-stone-400 transition-colors"
+                      className="border border-stone-600 bg-stone-800/50 p-4"
                     >
-                      <div className="flex justify-between items-center">
+                      <div className="flex justify-between items-center mb-2">
                         <div>
                           <p className="text-stone-100 font-mono">{formatStake(game.stake)} SOL</p>
                           <p className="text-stone-500 font-mono text-xs mt-1">
-                            vs {game.opponent ? shortenAddress(game.opponent) : 'Waiting...'}
+                            vs {game.opponent ? shortenAddress(game.opponent) : 'Waiting for opponent...'}
                           </p>
                         </div>
                         <div className="text-right">
                           <span className={`font-mono text-xs px-2 py-1 ${
                             game.status === 'waiting' ? 'bg-yellow-900/50 text-yellow-500' :
-                            game.status === 'revealing' ? 'bg-blue-900/50 text-blue-400' :
+                            game.status === 'committing' ? 'bg-blue-900/50 text-blue-400' :
+                            game.status === 'revealing' ? 'bg-purple-900/50 text-purple-400' :
+                            game.status === 'showdown' ? 'bg-orange-900/50 text-orange-400' :
                             'bg-stone-700 text-stone-400'
                           }`}>
                             {game.status.toUpperCase()}
                           </span>
                         </div>
                       </div>
-                    </button>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleSelectGame(game.id)}
+                          className="flex-1 bg-stone-700 text-stone-100 py-2 font-mono text-sm hover:bg-stone-600 transition-colors"
+                        >
+                          {game.status === 'waiting' ? 'View' : 'Continue'}
+                        </button>
+                        {game.status === 'waiting' && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              copyGameLink(game.id);
+                            }}
+                            className="bg-stone-600 text-stone-100 px-3 py-2 font-mono text-sm hover:bg-stone-500 transition-colors"
+                          >
+                            Copy Link
+                          </button>
+                        )}
+                      </div>
+                      {game.status === 'waiting' && (
+                        <p className="text-stone-600 font-mono text-xs mt-2 break-all">
+                          ID: {game.id}
+                        </p>
+                      )}
+                    </div>
                   ))}
                 </div>
               </div>
