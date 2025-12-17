@@ -273,12 +273,12 @@ export function ShadowDuel({ gameId, onBack }: ShadowDuelProps) {
     const nextRound = updatedGame.currentRound;
     
     if (nextRound < 3 && updatedGame.creatorReveal && updatedGame.opponentReveal) {
-      const creatorPower = updatedGame.creatorReveal.allocation[nextRound];
-      const opponentPower = updatedGame.opponentReveal.allocation[nextRound];
+      const creator = updatedGame.creatorReveal.allocation[nextRound];
+      const opponent = updatedGame.opponentReveal.allocation[nextRound];
       
       updatedGame.revealedRounds = [
         ...updatedGame.revealedRounds,
-        { round: nextRound, creatorPower, opponentPower }
+        { creator, opponent }
       ];
       updatedGame.currentRound = nextRound + 1;
       
@@ -288,8 +288,8 @@ export function ShadowDuel({ gameId, onBack }: ShadowDuelProps) {
         let opponentWins = 0;
         
         for (const r of updatedGame.revealedRounds) {
-          if (r.creatorPower > r.opponentPower) creatorWins++;
-          else if (r.opponentPower > r.creatorPower) opponentWins++;
+          if (r.creator > r.opponent) creatorWins++;
+          else if (r.opponent > r.creator) opponentWins++;
         }
         
         if (creatorWins > opponentWins) {
