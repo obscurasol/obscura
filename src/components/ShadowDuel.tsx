@@ -191,11 +191,19 @@ export function ShadowDuel({ gameId, onBack }: ShadowDuelProps) {
       // Save secret locally (needed for reveal)
       saveSecret(game.id, newSecret);
       
-      // Submit commitment
-      const updatedGame = submitCommitment(game.id, publicKey.toString(), commitment);
-      if (!updatedGame) {
-        setError('Failed to submit commitment');
-        return;
+      // Update game directly with commitment (works with Firebase)
+      const isCreator = publicKey.toString() === game.creator;
+      const updatedGame: ShadowDuelGame = { ...game };
+      
+      if (isCreator) {
+        updatedGame.creatorCommit = commitment;
+      } else {
+        updatedGame.opponentCommit = commitment;
+      }
+      
+      // Check if both have committed
+      if (updatedGame.creatorCommit && updatedGame.opponentCommit) {
+        updatedGame.status = 'revealing';
       }
       
       setGame(updatedGame);
@@ -219,19 +227,33 @@ export function ShadowDuel({ gameId, onBack }: ShadowDuelProps) {
         return;
       }
 
-      const result = await submitReveal(
-        game.id,
-        publicKey.toString(),
-        allocation,
-        savedSecret
-      );
-
-      if (!result.success) {
-        setError(result.error || 'Failed to reveal');
+      const isCreator = publicKey.toString() === game.creator;
+      const commitment = isCreator ? game.creatorCommit : game.opponentCommit;
+      
+      // Verify the commitment matches
+      const expectedCommit = await createCommitment(allocation, savedSecret);
+      if (commitment !== expectedCommit) {
+        setError('Commitment verification failed - allocation or secret mismatch');
         return;
       }
 
-      setGame(result.game);
+      // Update game with reveal
+      const updatedGame: ShadowDuelGame = { ...game };
+      const reveal = { allocation, secret: savedSecret };
+      
+      if (isCreator) {
+        updatedGame.creatorReveal = reveal;
+      } else {
+        updatedGame.opponentReveal = reveal;
+      }
+      
+      // Check if both have revealed
+      if (updatedGame.creatorReveal && updatedGame.opponentReveal) {
+        updatedGame.status = 'showdown';
+        updatedGame.currentRound = 0;
+      }
+      
+      setGame(updatedGame);
     } catch (e: any) {
       setError(e.message || 'Failed to reveal');
     } finally {
@@ -240,13 +262,47 @@ export function ShadowDuel({ gameId, onBack }: ShadowDuelProps) {
   };
 
   const handleRevealRound = async () => {
-    if (!game) return;
+    if (!game || !game.creatorReveal || !game.opponentReveal) return;
     setIsRevealing(true);
     
     // Dramatic delay
     await new Promise(resolve => setTimeout(resolve, 1500));
     
-    const updatedGame = revealNextRound(game.id);
+    // Reveal next round directly
+    const updatedGame: ShadowDuelGame = { ...game };
+    const nextRound = updatedGame.currentRound;
+    
+    if (nextRound < 3) {
+      const creatorPower = updatedGame.creatorReveal.allocation[nextRound];
+      const opponentPower = updatedGame.opponentReveal.allocation[nextRound];
+      
+      updatedGame.revealedRounds = [
+        ...updatedGame.revealedRounds,
+        { round: nextRound, creatorPower, opponentPower }
+      ];
+      updatedGame.currentRound = nextRound + 1;
+      
+      // Check for winner after all rounds
+      if (updatedGame.currentRound >= 3) {
+        let creatorWins = 0;
+        let opponentWins = 0;
+        
+        for (const r of updatedGame.revealedRounds) {
+          if (r.creatorPower > r.opponentPower) creatorWins++;
+          else if (r.opponentPower > r.creatorPower) opponentWins++;
+        }
+        
+        if (creatorWins > opponentWins) {
+          updatedGame.winner = updatedGame.creator;
+        } else if (opponentWins > creatorWins) {
+          updatedGame.winner = updatedGame.opponent;
+        } else {
+          updatedGame.winner = 'tie';
+        }
+        updatedGame.status = 'completed';
+      }
+    }
+    
     if (updatedGame) {
       setGame(updatedGame);
     }
