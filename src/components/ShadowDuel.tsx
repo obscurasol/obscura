@@ -18,6 +18,8 @@ import {
   createStakeTransaction,
   updateGameTx,
 } from '@/lib/games';
+import { useFirebaseGame } from '@/lib/useFirebaseGames';
+import { database, ref, set } from '@/lib/firebase';
 
 interface ShadowDuelProps {
   gameId?: string;
@@ -27,7 +29,7 @@ interface ShadowDuelProps {
 export function ShadowDuel({ gameId, onBack }: ShadowDuelProps) {
   const { publicKey, signTransaction } = useWallet();
   const { connection } = useConnection();
-  const [game, setGame] = useState<ShadowDuelGame | null>(null);
+  const [localGame, setLocalGame] = useState<ShadowDuelGame | null>(null);
   const [stake, setStake] = useState('0.01');
   const [allocation, setAllocation] = useState<number[]>([3, 3, 4]);
   const [secret, setSecret] = useState<string>('');
@@ -38,16 +40,37 @@ export function ShadowDuel({ gameId, onBack }: ShadowDuelProps) {
   
   // Store secret locally for this game
   const [localSecrets, setLocalSecrets] = useState<Record<string, string>>({});
-  const [syncCode, setSyncCode] = useState('');
+
+  // Firebase real-time game subscription
+  const { game: firebaseGame, loading: firebaseLoading } = useFirebaseGame(gameId || localGame?.id || null);
+  
+  // Use Firebase game if available, otherwise use local
+  const game = firebaseGame || localGame;
+  
+  // Sync local game to Firebase
+  const syncToFirebase = async (gameData: ShadowDuelGame) => {
+    try {
+      const gameRef = ref(database, `games/${gameData.id}`);
+      await set(gameRef, gameData);
+    } catch (err) {
+      console.error('Firebase sync error:', err);
+    }
+  };
+  
+  // Update both local and Firebase
+  const setGame = (gameData: ShadowDuelGame | null) => {
+    setLocalGame(gameData);
+    if (gameData) {
+      syncToFirebase(gameData);
+    }
+  };
 
   useEffect(() => {
-    if (gameId) {
+    if (gameId && !firebaseGame) {
+      // Try local storage as fallback
       const existingGame = getGame(gameId);
       if (existingGame) {
-        setGame(existingGame);
-      } else {
-        // Game doesn't exist locally - show join prompt
-        setGame(null);
+        setLocalGame(existingGame);
       }
       setIsCreating(false);
     }
@@ -57,65 +80,12 @@ export function ShadowDuel({ gameId, onBack }: ShadowDuelProps) {
     if (stored) {
       setLocalSecrets(JSON.parse(stored));
     }
-  }, [gameId]);
-
-  // Poll for game updates
-  useEffect(() => {
-    if (!game?.id) return;
-    
-    const interval = setInterval(() => {
-      const updated = getGame(game.id);
-      if (updated) {
-        setGame(updated);
-      }
-    }, 2000);
-    
-    return () => clearInterval(interval);
-  }, [game?.id]);
+  }, [gameId, firebaseGame]);
 
   const saveSecret = (gameId: string, secret: string) => {
     const updated = { ...localSecrets, [gameId]: secret };
     setLocalSecrets(updated);
     localStorage.setItem('obscura_secrets', JSON.stringify(updated));
-  };
-
-  // Sync functions for cross-browser play
-  const exportGameState = () => {
-    if (!game) return;
-    const exportData = JSON.stringify(game);
-    navigator.clipboard.writeText(exportData);
-    alert('Game state copied! Share with opponent to sync.');
-  };
-
-  const importGameState = () => {
-    if (!syncCode.trim()) return;
-    try {
-      const importedGame = JSON.parse(syncCode) as ShadowDuelGame;
-      if (importedGame.id) {
-        // Merge with existing game state (keep our commits/reveals if we have them)
-        const existingGame = getGame(importedGame.id);
-        const mergedGame = existingGame ? {
-          ...importedGame,
-          // Keep our commit if we have one
-          creatorCommit: existingGame.creatorCommit || importedGame.creatorCommit,
-          opponentCommit: existingGame.opponentCommit || importedGame.opponentCommit,
-          creatorReveal: existingGame.creatorReveal || importedGame.creatorReveal,
-          opponentReveal: existingGame.opponentReveal || importedGame.opponentReveal,
-        } : importedGame;
-        
-        // Save to localStorage
-        const stored = localStorage.getItem('obscura_shadow_duel_games');
-        const games = stored ? JSON.parse(stored) : {};
-        games[importedGame.id] = mergedGame;
-        localStorage.setItem('obscura_shadow_duel_games', JSON.stringify(games));
-        
-        setGame(mergedGame);
-        setSyncCode('');
-        alert('Game synced!');
-      }
-    } catch (e) {
-      alert('Invalid game data');
-    }
   };
 
   const totalAllocation = allocation.reduce((a, b) => a + b, 0);
@@ -483,35 +453,11 @@ export function ShadowDuel({ gameId, onBack }: ShadowDuelProps) {
         }`}>
           {game.status.toUpperCase()}
         </span>
-        <button
-          onClick={exportGameState}
-          className="text-stone-500 hover:text-stone-300 font-mono text-xs underline"
-        >
-          Copy State to Sync
-        </button>
+        <span className="text-green-500 font-mono text-xs flex items-center gap-1">
+          <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+          Live
+        </span>
       </div>
-
-      {/* Sync Input */}
-      {game.status !== 'completed' && (
-        <div className="mb-6 border border-stone-700 bg-stone-800/30 p-3">
-          <p className="text-stone-500 font-mono text-xs mb-2">Paste opponent's state to sync:</p>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={syncCode}
-              onChange={(e) => setSyncCode(e.target.value)}
-              placeholder='{"id":"duel_...","status":"..."}'
-              className="flex-1 bg-stone-800 border border-stone-600 px-2 py-1 text-stone-100 font-mono text-xs focus:border-stone-400 focus:outline-none"
-            />
-            <button
-              onClick={importGameState}
-              className="bg-stone-600 text-stone-100 px-3 py-1 font-mono text-xs hover:bg-stone-500"
-            >
-              Sync
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Players */}
       <div className="grid grid-cols-2 gap-4 mb-8">

@@ -4,23 +4,21 @@ import { useState, useEffect } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { ShadowDuel } from '@/components/ShadowDuel';
-import { getOpenGames, getPlayerGames, getGame, formatStake, shortenAddress, GameLobbyItem, ShadowDuelGame } from '@/lib/games';
+import { useFirebaseGames } from '@/lib/useFirebaseGames';
+import { formatStake, shortenAddress, ShadowDuelGame } from '@/lib/games';
 
 export default function GamesPage() {
   const { publicKey } = useWallet();
   const [view, setView] = useState<'lobby' | 'create' | 'game'>('lobby');
   const [selectedGameId, setSelectedGameId] = useState<string | undefined>();
-  const [openGames, setOpenGames] = useState<GameLobbyItem[]>([]);
-  const [myGames, setMyGames] = useState<ShadowDuelGame[]>([]);
   const [joinId, setJoinId] = useState('');
   const [joinError, setJoinError] = useState('');
 
-  useEffect(() => {
-    refreshGames();
-    const interval = setInterval(refreshGames, 3000);
-    return () => clearInterval(interval);
-    
-  }, [publicKey]);
+  // Firebase hooks for real-time game sync
+  const { games, isConnected, error: firebaseError, getOpenGames, getPlayerGames } = useFirebaseGames();
+
+  const openGames = getOpenGames().filter(g => g.creator !== publicKey?.toString());
+  const myGames = publicKey ? getPlayerGames(publicKey.toString()) : [];
 
   // Check URL for game ID on load
   useEffect(() => {
@@ -32,13 +30,6 @@ export default function GamesPage() {
       }
     }
   }, []);
-
-  const refreshGames = () => {
-    setOpenGames(getOpenGames());
-    if (publicKey) {
-      setMyGames(getPlayerGames(publicKey.toString()));
-    }
-  };
 
   const handleSelectGame = (gameId: string) => {
     setSelectedGameId(gameId);
@@ -53,7 +44,6 @@ export default function GamesPage() {
   const handleBackToLobby = () => {
     setView('lobby');
     setSelectedGameId(undefined);
-    refreshGames();
     // Clear URL params
     if (typeof window !== 'undefined') {
       window.history.replaceState({}, '', '/games');
@@ -68,8 +58,6 @@ export default function GamesPage() {
       return;
     }
     
-    // Try to get the game (it might exist in another browser's localStorage)
-    // For now, we'll navigate to the game and let ShadowDuel handle it
     setSelectedGameId(trimmedId);
     setView('game');
   };
@@ -93,6 +81,22 @@ export default function GamesPage() {
             Strategic hidden-state combat. Allocate power across three rounds.
             Outmaneuver your opponent. Winner takes all.
           </p>
+          {/* Connection Status */}
+          <div className="mt-4">
+            {isConnected ? (
+              <span className="text-green-500 font-mono text-xs">
+                Live - {Object.keys(games).length} games active
+              </span>
+            ) : firebaseError ? (
+              <span className="text-yellow-500 font-mono text-xs">
+                Offline mode - {firebaseError}
+              </span>
+            ) : (
+              <span className="text-stone-500 font-mono text-xs">
+                Connecting...
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Wallet Connection */}
@@ -193,7 +197,7 @@ export default function GamesPage() {
             )}
 
             {/* My Active Games */}
-            {publicKey && myGames.length > 0 && (
+            {publicKey && myGames.filter(g => g.status !== 'completed').length > 0 && (
               <div className="mb-8">
                 <h2 className="font-serif text-xl text-stone-100 mb-4">My Games</h2>
                 <div className="space-y-3">
@@ -256,11 +260,13 @@ export default function GamesPage() {
               <h2 className="font-serif text-xl text-stone-100 mb-4">Open Duels</h2>
               {openGames.length === 0 ? (
                 <div className="border border-stone-700 bg-stone-900/50 p-8 text-center">
-                  <p className="text-stone-500 font-mono">No open games. Create one to start.</p>
+                  <p className="text-stone-500 font-mono">
+                    {isConnected ? 'No open games. Create one to start.' : 'Connect to see open games...'}
+                  </p>
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {openGames.filter(g => g.creator !== publicKey?.toString()).map((game) => (
+                  {openGames.map((game) => (
                     <button
                       key={game.id}
                       onClick={() => handleSelectGame(game.id)}
@@ -327,4 +333,3 @@ export default function GamesPage() {
     </main>
   );
 }
-
