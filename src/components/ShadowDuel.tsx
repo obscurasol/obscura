@@ -277,7 +277,7 @@ export function ShadowDuel({ gameId, onBack }: ShadowDuelProps) {
       const opponent = updatedGame.opponentReveal.allocation[nextRound];
       
       updatedGame.revealedRounds = [
-        ...updatedGame.revealedRounds,
+        ...(updatedGame.revealedRounds || []),
         { creator, opponent }
       ];
       updatedGame.currentRound = nextRound + 1;
@@ -287,7 +287,7 @@ export function ShadowDuel({ gameId, onBack }: ShadowDuelProps) {
         let creatorWins = 0;
         let opponentWins = 0;
         
-        for (const r of updatedGame.revealedRounds) {
+        for (const r of (updatedGame.revealedRounds || [])) {
           if (r.creator > r.opponent) creatorWins++;
           else if (r.opponent > r.creator) opponentWins++;
         }
@@ -601,7 +601,7 @@ export function ShadowDuel({ gameId, onBack }: ShadowDuelProps) {
           
           {/* Revealed Rounds */}
           <div className="space-y-4 mb-6">
-            {game.revealedRounds.map((round, index) => {
+            {(game.revealedRounds || []).map((round, index) => {
               const creatorWon = round.creator > round.opponent;
               const opponentWon = round.opponent > round.creator;
               
@@ -626,10 +626,10 @@ export function ShadowDuel({ gameId, onBack }: ShadowDuelProps) {
             })}
 
             {/* Unrevealed Rounds */}
-            {Array.from({ length: 3 - game.revealedRounds.length }).map((_, index) => (
+            {Array.from({ length: 3 - (game.revealedRounds || []).length }).map((_, index) => (
               <div key={`unrevealed-${index}`} className="border border-stone-700 bg-stone-900/50 p-4">
                 <p className="text-stone-500 font-mono text-xs mb-2">
-                  ROUND {['I', 'II', 'III'][game.revealedRounds.length + index]}
+                  ROUND {['I', 'II', 'III'][(game.revealedRounds || []).length + index]}
                 </p>
                 <div className="grid grid-cols-3 gap-4 items-center">
                   <div className="text-center text-stone-600">
@@ -675,7 +675,7 @@ export function ShadowDuel({ gameId, onBack }: ShadowDuelProps) {
 
           {/* Final Results */}
           <div className="space-y-2 mb-6">
-            {game.revealedRounds.map((round, index) => {
+            {(game.revealedRounds || []).map((round, index) => {
               const creatorWon = round.creator > round.opponent;
               const opponentWon = round.opponent > round.creator;
               
