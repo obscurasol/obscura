@@ -38,6 +38,7 @@ export function ShadowDuel({ gameId, onBack }: ShadowDuelProps) {
   
   // Store secret locally for this game
   const [localSecrets, setLocalSecrets] = useState<Record<string, string>>({});
+  const [syncCode, setSyncCode] = useState('');
 
   useEffect(() => {
     if (gameId) {
@@ -76,6 +77,45 @@ export function ShadowDuel({ gameId, onBack }: ShadowDuelProps) {
     const updated = { ...localSecrets, [gameId]: secret };
     setLocalSecrets(updated);
     localStorage.setItem('obscura_secrets', JSON.stringify(updated));
+  };
+
+  // Sync functions for cross-browser play
+  const exportGameState = () => {
+    if (!game) return;
+    const exportData = JSON.stringify(game);
+    navigator.clipboard.writeText(exportData);
+    alert('Game state copied! Share with opponent to sync.');
+  };
+
+  const importGameState = () => {
+    if (!syncCode.trim()) return;
+    try {
+      const importedGame = JSON.parse(syncCode) as ShadowDuelGame;
+      if (importedGame.id) {
+        // Merge with existing game state (keep our commits/reveals if we have them)
+        const existingGame = getGame(importedGame.id);
+        const mergedGame = existingGame ? {
+          ...importedGame,
+          // Keep our commit if we have one
+          creatorCommit: existingGame.creatorCommit || importedGame.creatorCommit,
+          opponentCommit: existingGame.opponentCommit || importedGame.opponentCommit,
+          creatorReveal: existingGame.creatorReveal || importedGame.creatorReveal,
+          opponentReveal: existingGame.opponentReveal || importedGame.opponentReveal,
+        } : importedGame;
+        
+        // Save to localStorage
+        const stored = localStorage.getItem('obscura_shadow_duel_games');
+        const games = stored ? JSON.parse(stored) : {};
+        games[importedGame.id] = mergedGame;
+        localStorage.setItem('obscura_shadow_duel_games', JSON.stringify(games));
+        
+        setGame(mergedGame);
+        setSyncCode('');
+        alert('Game synced!');
+      }
+    } catch (e) {
+      alert('Invalid game data');
+    }
   };
 
   const totalAllocation = allocation.reduce((a, b) => a + b, 0);
@@ -433,7 +473,7 @@ export function ShadowDuel({ gameId, onBack }: ShadowDuelProps) {
       </div>
 
       {/* Status Badge */}
-      <div className="mb-6">
+      <div className="mb-6 flex items-center justify-between">
         <span className={`font-mono text-xs px-3 py-1 ${
           game.status === 'waiting' ? 'bg-yellow-900/50 text-yellow-500' :
           game.status === 'committing' ? 'bg-blue-900/50 text-blue-400' :
@@ -443,7 +483,35 @@ export function ShadowDuel({ gameId, onBack }: ShadowDuelProps) {
         }`}>
           {game.status.toUpperCase()}
         </span>
+        <button
+          onClick={exportGameState}
+          className="text-stone-500 hover:text-stone-300 font-mono text-xs underline"
+        >
+          Copy State to Sync
+        </button>
       </div>
+
+      {/* Sync Input */}
+      {game.status !== 'completed' && (
+        <div className="mb-6 border border-stone-700 bg-stone-800/30 p-3">
+          <p className="text-stone-500 font-mono text-xs mb-2">Paste opponent's state to sync:</p>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={syncCode}
+              onChange={(e) => setSyncCode(e.target.value)}
+              placeholder='{"id":"duel_...","status":"..."}'
+              className="flex-1 bg-stone-800 border border-stone-600 px-2 py-1 text-stone-100 font-mono text-xs focus:border-stone-400 focus:outline-none"
+            />
+            <button
+              onClick={importGameState}
+              className="bg-stone-600 text-stone-100 px-3 py-1 font-mono text-xs hover:bg-stone-500"
+            >
+              Sync
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Players */}
       <div className="grid grid-cols-2 gap-4 mb-8">
