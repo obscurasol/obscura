@@ -1,16 +1,26 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { database, ref, set, get, onValue, remove } from './firebase';
+import { database, ref, set, onValue, remove } from './firebase';
 import { ShadowDuelGame } from './games';
 
 export function useFirebaseGames() {
   const [games, setGames] = useState<Record<string, ShadowDuelGame>>({});
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  // Mark as mounted on client
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Listen for all games
   useEffect(() => {
+    if (!mounted || !database) {
+      return;
+    }
+
     try {
       const gamesRef = ref(database, 'games');
       const unsubscribe = onValue(gamesRef, (snapshot) => {
@@ -30,10 +40,11 @@ export function useFirebaseGames() {
       setError('Game server not configured');
       setIsConnected(false);
     }
-  }, []);
+  }, [mounted]);
 
   // Save game to Firebase
   const saveGame = useCallback(async (game: ShadowDuelGame) => {
+    if (!database) return false;
     try {
       const gameRef = ref(database, `games/${game.id}`);
       await set(gameRef, game);
@@ -63,6 +74,7 @@ export function useFirebaseGames() {
 
   // Delete game
   const deleteGame = useCallback(async (gameId: string) => {
+    if (!database) return false;
     try {
       const gameRef = ref(database, `games/${gameId}`);
       await remove(gameRef);
@@ -89,9 +101,19 @@ export function useFirebaseGames() {
 export function useFirebaseGame(gameId: string | null) {
   const [game, setGame] = useState<ShadowDuelGame | null>(null);
   const [loading, setLoading] = useState(true);
+  const [mounted, setMounted] = useState(false);
+
+  // Mark as mounted on client
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
-    if (!gameId) {
+    if (!mounted) {
+      return;
+    }
+
+    if (!gameId || !database) {
       setGame(null);
       setLoading(false);
       return;
@@ -113,8 +135,7 @@ export function useFirebaseGame(gameId: string | null) {
       console.error('Game init error:', err);
       setLoading(false);
     }
-  }, [gameId]);
+  }, [gameId, mounted]);
 
   return { game, loading };
 }
-

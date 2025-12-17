@@ -49,6 +49,7 @@ export function ShadowDuel({ gameId, onBack }: ShadowDuelProps) {
   
   // Sync local game to Firebase
   const syncToFirebase = async (gameData: ShadowDuelGame) => {
+    if (!database) return;
     try {
       const gameRef = ref(database, `games/${gameData.id}`);
       await set(gameRef, gameData);

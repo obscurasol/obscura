@@ -1,5 +1,5 @@
-import { initializeApp } from 'firebase/app';
-import { getDatabase, ref, set, get, onValue, remove, push, update } from 'firebase/database';
+import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
+import { getDatabase, ref, set, get, onValue, remove, push, update, Database } from 'firebase/database';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDpm0eKyxei2vUJBp4YhbqgxbIuSNyQFNg",
@@ -12,7 +12,13 @@ const firebaseConfig = {
   measurementId: "G-B34QRB2XTZ"
 };
 
-const app = initializeApp(firebaseConfig);
-const database = getDatabase(app);
+// Only initialize on client side
+let app: FirebaseApp | undefined;
+let database: Database | undefined;
+
+if (typeof window !== 'undefined') {
+  app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+  database = getDatabase(app);
+}
 
 export { database, ref, set, get, onValue, remove, push, update };
