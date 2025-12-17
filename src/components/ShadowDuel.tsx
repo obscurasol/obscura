@@ -272,7 +272,7 @@ export function ShadowDuel({ gameId, onBack }: ShadowDuelProps) {
     const updatedGame: ShadowDuelGame = { ...game };
     const nextRound = updatedGame.currentRound;
     
-    if (nextRound < 3) {
+    if (nextRound < 3 && updatedGame.creatorReveal && updatedGame.opponentReveal) {
       const creatorPower = updatedGame.creatorReveal.allocation[nextRound];
       const opponentPower = updatedGame.opponentReveal.allocation[nextRound];
       
