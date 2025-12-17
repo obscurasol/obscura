@@ -23,7 +23,7 @@ export default function Home() {
             
             <div className="hidden md:flex items-center gap-8">
               <a href="#features" className="text-sm text-[#58586a] hover:text-[#9898a8] transition-colors">Features</a>
-              <a href="#how-it-works" className="text-sm text-[#58586a] hover:text-[#9898a8] transition-colors">How it Works</a>
+              <Link href="/games" className="text-sm text-[#58586a] hover:text-[#9898a8] transition-colors">Games</Link>
               <a href="#technology" className="text-sm text-[#58586a] hover:text-[#9898a8] transition-colors">Technology</a>
               <Link href="/docs" className="text-sm text-[#58586a] hover:text-[#9898a8] transition-colors">Docs</Link>
             </div>
@@ -158,6 +158,65 @@ export default function Home() {
                 </p>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Games Section */}
+      <section id="games" className="py-32 px-8 border-t border-[#1a1a25]/50">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+            <div>
+              <p className="text-sm text-[#58586a] uppercase tracking-wider mb-4">Encrypted Games</p>
+              <h2 className="text-4xl md:text-5xl font-medium text-[#e8e8ed] mb-8 glow-text">
+                Shadow Duel
+              </h2>
+              <p className="text-lg text-[#9898a8] leading-relaxed mb-8">
+                The first onchain game with truly hidden state. Allocate power across three rounds, 
+                outsmart your opponent, winner takes the pot. All powered by Arcium's encrypted compute.
+              </p>
+              <div className="space-y-4 mb-10">
+                {[
+                  { numeral: "I", text: "Hidden allocation - opponent can't see your strategy" },
+                  { numeral: "II", text: "Dramatic round-by-round reveal" },
+                  { numeral: "III", text: "Stake SOL and compete for the pot" },
+                ].map((item, i) => (
+                  <div key={i} className="flex items-center gap-4">
+                    <div className="w-8 h-8 rounded-lg bg-[#151520] flex items-center justify-center flex-shrink-0">
+                      <span className="text-xs font-medium text-[#58586a]">{item.numeral}</span>
+                    </div>
+                    <span className="text-[#9898a8]">{item.text}</span>
+                  </div>
+                ))}
+              </div>
+              <Link href="/games" className="btn-primary text-base py-4 px-10">
+                Play Now
+              </Link>
+            </div>
+            <div className="relative">
+              <div className="glass-card p-8">
+                <div className="text-center mb-6">
+                  <p className="text-xs text-[#58586a] uppercase tracking-wider mb-2">Shadow Duel</p>
+                  <p className="text-2xl font-medium text-[#e8e8ed]">0.1 SOL Pot</p>
+                </div>
+                <div className="grid grid-cols-3 gap-4 mb-6">
+                  {['I', 'II', 'III'].map((numeral, i) => (
+                    <div key={i} className="p-4 bg-[#0a0a0f] rounded-xl border border-[#1a1a25] text-center">
+                      <p className="text-xs text-[#58586a] mb-2">ROUND {numeral}</p>
+                      <p className="text-3xl font-medium text-[#3a3a50]">?</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex justify-between text-sm text-[#58586a] mb-4">
+                  <span>Your allocation</span>
+                  <span>10 power points</span>
+                </div>
+                <div className="h-2 bg-[#151520] rounded-full overflow-hidden">
+                  <div className="h-full w-full bg-gradient-to-r from-[#3a3a50] via-[#4a4a60] to-[#3a3a50] rounded-full animate-pulse" />
+                </div>
+                <p className="text-xs text-[#58586a] text-center mt-4">Encrypted until reveal</p>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -312,6 +371,10 @@ export default function Home() {
             
             <div className="flex items-center gap-6 text-sm text-[#58586a]">
               <span>Solana Devnet</span>
+              <span className="w-1 h-1 rounded-full bg-[#58586a]" />
+              <Link href="/games" className="hover:text-[#9898a8] transition-colors">
+                Games
+              </Link>
               <span className="w-1 h-1 rounded-full bg-[#58586a]" />
               <a href="https://x.com/obscura_arc" target="_blank" rel="noopener noreferrer" className="hover:text-[#9898a8] transition-colors">
                 Twitter
