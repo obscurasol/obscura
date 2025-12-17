@@ -1,17 +1,22 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useWallet } from '@solana/wallet-adapter-react';
+import { useWallet, useConnection } from '@solana/wallet-adapter-react';
 import { 
   ShadowDuelGame, 
   createGame, 
   joinGame, 
-  submitAllocation, 
+  submitCommitment,
+  submitReveal,
   revealNextRound,
   getGame,
   formatStake,
   parseStake,
-  shortenAddress
+  shortenAddress,
+  generateSecret,
+  createCommitment,
+  createStakeTransaction,
+  updateGameTx
 } from '@/lib/games';
 
 interface ShadowDuelProps {
@@ -20,13 +25,19 @@ interface ShadowDuelProps {
 }
 
 export function ShadowDuel({ gameId, onBack }: ShadowDuelProps) {
-  const { publicKey } = useWallet();
+  const { publicKey, signTransaction } = useWallet();
+  const { connection } = useConnection();
   const [game, setGame] = useState<ShadowDuelGame | null>(null);
   const [stake, setStake] = useState('0.01');
   const [allocation, setAllocation] = useState<number[]>([3, 3, 4]);
+  const [secret, setSecret] = useState<string>('');
   const [isCreating, setIsCreating] = useState(!gameId);
   const [error, setError] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
   const [isRevealing, setIsRevealing] = useState(false);
+  
+  // Store secret locally for this game
+  const [localSecrets, setLocalSecrets] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (gameId) {
@@ -34,7 +45,33 @@ export function ShadowDuel({ gameId, onBack }: ShadowDuelProps) {
       setGame(existingGame);
       setIsCreating(false);
     }
+    
+    // Load secrets from localStorage
+    const stored = localStorage.getItem('obscura_secrets');
+    if (stored) {
+      setLocalSecrets(JSON.parse(stored));
+    }
   }, [gameId]);
+
+  // Poll for game updates
+  useEffect(() => {
+    if (!game?.id) return;
+    
+    const interval = setInterval(() => {
+      const updated = getGame(game.id);
+      if (updated) {
+        setGame(updated);
+      }
+    }, 2000);
+    
+    return () => clearInterval(interval);
+  }, [game?.id]);
+
+  const saveSecret = (gameId: string, secret: string) => {
+    const updated = { ...localSecrets, [gameId]: secret };
+    setLocalSecrets(updated);
+    localStorage.setItem('obscura_secrets', JSON.stringify(updated));
+  };
 
   const totalAllocation = allocation.reduce((a, b) => a + b, 0);
   const isValidAllocation = totalAllocation === 10 && allocation.every(v => v >= 0 && v <= 10);
@@ -45,50 +82,128 @@ export function ShadowDuel({ gameId, onBack }: ShadowDuelProps) {
     setAllocation(newAllocation);
   };
 
-  const handleCreateGame = () => {
-    if (!publicKey) return;
+  const handleCreateGame = async () => {
+    if (!publicKey || !signTransaction) return;
     setError('');
+    setIsProcessing(true);
     
-    const stakeAmount = parseStake(stake);
-    if (stakeAmount <= 0) {
-      setError('Invalid stake amount');
-      return;
-    }
+    try {
+      const stakeAmount = parseStake(stake);
+      if (stakeAmount <= 0) {
+        setError('Invalid stake amount');
+        return;
+      }
 
-    const newGame = createGame(publicKey.toString(), stakeAmount);
-    setGame(newGame);
-    setIsCreating(false);
+      // Create stake transaction (proof of stake)
+      const tx = await createStakeTransaction(connection, publicKey, stakeAmount);
+      const signed = await signTransaction(tx);
+      const sig = await connection.sendRawTransaction(signed.serialize());
+      
+      // Create game
+      const newGame = createGame(publicKey.toString(), stakeAmount);
+      updateGameTx(newGame.id, 'createTx', sig);
+      
+      setGame(newGame);
+      setIsCreating(false);
+    } catch (e: any) {
+      setError(e.message || 'Failed to create game');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
-  const handleJoinGame = () => {
-    if (!publicKey || !game) return;
+  const handleJoinGame = async () => {
+    if (!publicKey || !signTransaction || !game) return;
     setError('');
+    setIsProcessing(true);
 
-    const updatedGame = joinGame(game.id, publicKey.toString());
-    if (!updatedGame) {
-      setError('Failed to join game');
-      return;
+    try {
+      // Create stake transaction
+      const tx = await createStakeTransaction(connection, publicKey, game.stake);
+      const signed = await signTransaction(tx);
+      const sig = await connection.sendRawTransaction(signed.serialize());
+
+      const updatedGame = joinGame(game.id, publicKey.toString());
+      if (!updatedGame) {
+        setError('Failed to join game');
+        return;
+      }
+      
+      updateGameTx(game.id, 'joinTx', sig);
+      setGame(updatedGame);
+    } catch (e: any) {
+      setError(e.message || 'Failed to join game');
+    } finally {
+      setIsProcessing(false);
     }
-    setGame(updatedGame);
   };
 
-  const handleSubmitAllocation = () => {
+  const handleCommit = async () => {
     if (!publicKey || !game || !isValidAllocation) return;
     setError('');
+    setIsProcessing(true);
 
-    const updatedGame = submitAllocation(game.id, publicKey.toString(), allocation);
-    if (!updatedGame) {
-      setError('Failed to submit allocation');
-      return;
+    try {
+      // Generate secret and create commitment
+      const newSecret = generateSecret();
+      const commitment = await createCommitment(allocation, newSecret);
+      
+      // Save secret locally (needed for reveal)
+      saveSecret(game.id, newSecret);
+      
+      // Submit commitment
+      const updatedGame = submitCommitment(game.id, publicKey.toString(), commitment);
+      if (!updatedGame) {
+        setError('Failed to submit commitment');
+        return;
+      }
+      
+      setGame(updatedGame);
+    } catch (e: any) {
+      setError(e.message || 'Failed to commit');
+    } finally {
+      setIsProcessing(false);
     }
-    setGame(updatedGame);
+  };
+
+  const handleReveal = async () => {
+    if (!publicKey || !game) return;
+    setError('');
+    setIsProcessing(true);
+
+    try {
+      // Get saved secret
+      const savedSecret = localSecrets[game.id];
+      if (!savedSecret) {
+        setError('Secret not found - did you commit from this browser?');
+        return;
+      }
+
+      const result = await submitReveal(
+        game.id,
+        publicKey.toString(),
+        allocation,
+        savedSecret
+      );
+
+      if (!result.success) {
+        setError(result.error || 'Failed to reveal');
+        return;
+      }
+
+      setGame(result.game);
+    } catch (e: any) {
+      setError(e.message || 'Failed to reveal');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleRevealRound = async () => {
     if (!game) return;
     setIsRevealing(true);
     
-    // Dramatic delay for reveal
+    // Dramatic delay
     await new Promise(resolve => setTimeout(resolve, 1500));
     
     const updatedGame = revealNextRound(game.id);
@@ -101,7 +216,9 @@ export function ShadowDuel({ gameId, onBack }: ShadowDuelProps) {
   const isCreator = publicKey?.toString() === game?.creator;
   const isOpponent = publicKey?.toString() === game?.opponent;
   const isPlayer = isCreator || isOpponent;
-  const hasSubmitted = isCreator ? !!game?.creatorAllocation : !!game?.opponentAllocation;
+  
+  const hasCommitted = isCreator ? !!game?.creatorCommit : !!game?.opponentCommit;
+  const hasRevealed = isCreator ? !!game?.creatorReveal : !!game?.opponentReveal;
 
   if (!publicKey) {
     return (
@@ -142,7 +259,15 @@ export function ShadowDuel({ gameId, onBack }: ShadowDuelProps) {
 
           <div className="border border-stone-700 bg-stone-800/50 p-4">
             <p className="text-stone-400 font-mono text-sm">
-              Opponent will match your stake. Winner takes {parseFloat(stake) * 2} SOL.
+              Opponent will match your stake. Winner takes {(parseFloat(stake) * 2).toFixed(4)} SOL.
+            </p>
+          </div>
+
+          <div className="border border-green-900/50 bg-green-900/20 p-4">
+            <p className="text-green-400 font-mono text-xs mb-2">COMMIT-REVEAL PRIVACY</p>
+            <p className="text-stone-400 font-mono text-sm">
+              Your allocation is cryptographically hidden until both players reveal. 
+              No one can see your strategy - not even the blockchain.
             </p>
           </div>
 
@@ -152,9 +277,10 @@ export function ShadowDuel({ gameId, onBack }: ShadowDuelProps) {
 
           <button
             onClick={handleCreateGame}
-            className="w-full bg-stone-100 text-stone-900 py-3 font-mono hover:bg-stone-200 transition-colors"
+            disabled={isProcessing}
+            className="w-full bg-stone-100 text-stone-900 py-3 font-mono hover:bg-stone-200 transition-colors disabled:opacity-50"
           >
-            Create Duel
+            {isProcessing ? 'Creating...' : 'Create Duel'}
           </button>
         </div>
       </div>
@@ -188,7 +314,7 @@ export function ShadowDuel({ gameId, onBack }: ShadowDuelProps) {
       <div className="flex justify-between items-start mb-8">
         <div>
           <h2 className="font-serif text-2xl text-stone-100">Shadow Duel</h2>
-          <p className="text-stone-500 font-mono text-sm mt-1">
+          <p className="text-stone-500 font-mono text-xs mt-1 break-all">
             {game.id}
           </p>
         </div>
@@ -199,49 +325,65 @@ export function ShadowDuel({ gameId, onBack }: ShadowDuelProps) {
         </div>
       </div>
 
+      {/* Status Badge */}
+      <div className="mb-6">
+        <span className={`font-mono text-xs px-3 py-1 ${
+          game.status === 'waiting' ? 'bg-yellow-900/50 text-yellow-500' :
+          game.status === 'committing' ? 'bg-blue-900/50 text-blue-400' :
+          game.status === 'revealing' ? 'bg-purple-900/50 text-purple-400' :
+          game.status === 'showdown' ? 'bg-orange-900/50 text-orange-400' :
+          'bg-green-900/50 text-green-400'
+        }`}>
+          {game.status.toUpperCase()}
+        </span>
+      </div>
+
       {/* Players */}
       <div className="grid grid-cols-2 gap-4 mb-8">
         <div className={`border p-4 ${isCreator ? 'border-stone-400 bg-stone-800/50' : 'border-stone-700'}`}>
           <p className="text-stone-500 font-mono text-xs mb-1">CREATOR</p>
-          <p className="text-stone-100 font-mono">{shortenAddress(game.creator)}</p>
-          {game.creatorAllocation && <p className="text-green-500 font-mono text-xs mt-1">READY</p>}
+          <p className="text-stone-100 font-mono text-sm">{shortenAddress(game.creator)}</p>
+          {game.creatorCommit && <p className="text-blue-400 font-mono text-xs mt-1">COMMITTED</p>}
+          {game.creatorReveal && <p className="text-green-500 font-mono text-xs mt-1">REVEALED</p>}
         </div>
         <div className={`border p-4 ${isOpponent ? 'border-stone-400 bg-stone-800/50' : 'border-stone-700'}`}>
           <p className="text-stone-500 font-mono text-xs mb-1">OPPONENT</p>
           {game.opponent ? (
             <>
-              <p className="text-stone-100 font-mono">{shortenAddress(game.opponent)}</p>
-              {game.opponentAllocation && <p className="text-green-500 font-mono text-xs mt-1">READY</p>}
+              <p className="text-stone-100 font-mono text-sm">{shortenAddress(game.opponent)}</p>
+              {game.opponentCommit && <p className="text-blue-400 font-mono text-xs mt-1">COMMITTED</p>}
+              {game.opponentReveal && <p className="text-green-500 font-mono text-xs mt-1">REVEALED</p>}
             </>
           ) : (
-            <p className="text-stone-500 font-mono">Waiting...</p>
+            <p className="text-stone-500 font-mono text-sm">Waiting...</p>
           )}
         </div>
       </div>
 
-      {/* Game Status */}
+      {/* Waiting for opponent */}
       {game.status === 'waiting' && !isCreator && (
         <button
           onClick={handleJoinGame}
-          className="w-full bg-stone-100 text-stone-900 py-3 font-mono hover:bg-stone-200 transition-colors mb-6"
+          disabled={isProcessing}
+          className="w-full bg-stone-100 text-stone-900 py-3 font-mono hover:bg-stone-200 transition-colors disabled:opacity-50 mb-6"
         >
-          Join Duel ({formatStake(game.stake)} SOL)
+          {isProcessing ? 'Joining...' : `Join Duel (${formatStake(game.stake)} SOL)`}
         </button>
       )}
 
       {game.status === 'waiting' && isCreator && (
         <div className="border border-stone-700 bg-stone-800/50 p-4 mb-6 text-center">
           <p className="text-stone-400 font-mono">Waiting for opponent to join...</p>
-          <p className="text-stone-500 font-mono text-sm mt-2">Share game ID: {game.id}</p>
+          <p className="text-stone-500 font-mono text-xs mt-2 break-all">Share ID: {game.id}</p>
         </div>
       )}
 
-      {/* Allocation Phase */}
-      {(game.status === 'joined' || game.status === 'allocated') && isPlayer && !hasSubmitted && (
+      {/* Commit Phase */}
+      {game.status === 'committing' && isPlayer && !hasCommitted && (
         <div className="mb-6">
-          <h3 className="font-serif text-lg text-stone-100 mb-4">Allocate Your Power</h3>
+          <h3 className="font-serif text-lg text-stone-100 mb-4">Lock In Your Strategy</h3>
           <p className="text-stone-400 font-mono text-sm mb-4">
-            Distribute 10 power points across 3 rounds. Higher power wins the round.
+            Distribute 10 power points. Your allocation will be cryptographically hidden.
           </p>
 
           <div className="grid grid-cols-3 gap-4 mb-4">
@@ -267,39 +409,79 @@ export function ShadowDuel({ gameId, onBack }: ShadowDuelProps) {
             </span>
           </div>
 
-          {error && (
-            <p className="text-red-400 font-mono text-sm mb-4">{error}</p>
-          )}
+          <div className="border border-blue-900/50 bg-blue-900/20 p-3 mb-4">
+            <p className="text-blue-400 font-mono text-xs">
+              HASH COMMITMENT: Your allocation is hashed with a secret. Only you can reveal it later.
+            </p>
+          </div>
+
+          {error && <p className="text-red-400 font-mono text-sm mb-4">{error}</p>}
 
           <button
-            onClick={handleSubmitAllocation}
-            disabled={!isValidAllocation}
-            className="w-full bg-stone-100 text-stone-900 py-3 font-mono hover:bg-stone-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={handleCommit}
+            disabled={!isValidAllocation || isProcessing}
+            className="w-full bg-stone-100 text-stone-900 py-3 font-mono hover:bg-stone-200 transition-colors disabled:opacity-50"
           >
-            Lock In Allocation
+            {isProcessing ? 'Committing...' : 'Commit Allocation'}
           </button>
         </div>
       )}
 
-      {/* Waiting for opponent allocation */}
-      {game.status === 'allocated' && hasSubmitted && (
+      {/* Waiting for other player to commit */}
+      {game.status === 'committing' && hasCommitted && (
         <div className="border border-stone-700 bg-stone-800/50 p-4 mb-6 text-center">
-          <p className="text-stone-400 font-mono">Your allocation is encrypted.</p>
-          <p className="text-stone-500 font-mono text-sm mt-2">Waiting for opponent...</p>
+          <p className="text-green-400 font-mono mb-2">Your allocation is locked and hidden.</p>
+          <p className="text-stone-500 font-mono text-sm">Waiting for opponent to commit...</p>
         </div>
       )}
 
       {/* Reveal Phase */}
-      {game.status === 'revealing' && (
+      {game.status === 'revealing' && isPlayer && !hasRevealed && (
         <div className="mb-6">
-          <h3 className="font-serif text-lg text-stone-100 mb-4">The Reveal</h3>
+          <h3 className="font-serif text-lg text-stone-100 mb-4">Reveal Your Allocation</h3>
+          <p className="text-stone-400 font-mono text-sm mb-4">
+            Both players have committed. Now reveal to prove your allocation.
+          </p>
+
+          <div className="grid grid-cols-3 gap-4 mb-4">
+            {['I', 'II', 'III'].map((numeral, index) => (
+              <div key={index} className="border border-stone-600 bg-stone-800/50 p-4">
+                <p className="text-stone-500 font-mono text-xs mb-2">ROUND {numeral}</p>
+                <p className="text-stone-100 font-mono text-center text-xl">{allocation[index]}</p>
+              </div>
+            ))}
+          </div>
+
+          {error && <p className="text-red-400 font-mono text-sm mb-4">{error}</p>}
+
+          <button
+            onClick={handleReveal}
+            disabled={isProcessing}
+            className="w-full bg-stone-100 text-stone-900 py-3 font-mono hover:bg-stone-200 transition-colors disabled:opacity-50"
+          >
+            {isProcessing ? 'Revealing...' : 'Reveal Allocation'}
+          </button>
+        </div>
+      )}
+
+      {/* Waiting for other player to reveal */}
+      {game.status === 'revealing' && hasRevealed && (
+        <div className="border border-stone-700 bg-stone-800/50 p-4 mb-6 text-center">
+          <p className="text-green-400 font-mono mb-2">Your allocation revealed.</p>
+          <p className="text-stone-500 font-mono text-sm">Waiting for opponent to reveal...</p>
+        </div>
+      )}
+
+      {/* Showdown Phase */}
+      {game.status === 'showdown' && (
+        <div className="mb-6">
+          <h3 className="font-serif text-lg text-stone-100 mb-4">The Showdown</h3>
           
           {/* Revealed Rounds */}
           <div className="space-y-4 mb-6">
             {game.revealedRounds.map((round, index) => {
               const creatorWon = round.creator > round.opponent;
               const opponentWon = round.opponent > round.creator;
-              const tie = round.creator === round.opponent;
               
               return (
                 <div key={index} className="border border-stone-600 bg-stone-800/50 p-4">
@@ -311,9 +493,7 @@ export function ShadowDuel({ gameId, onBack }: ShadowDuelProps) {
                       <p className="font-mono text-2xl">{round.creator}</p>
                       <p className="font-mono text-xs">{shortenAddress(game.creator)}</p>
                     </div>
-                    <div className="text-center text-stone-500 font-mono">
-                      {tie ? 'TIE' : 'VS'}
-                    </div>
+                    <div className="text-center text-stone-500 font-mono">VS</div>
                     <div className={`text-center ${opponentWon ? 'text-green-500' : 'text-stone-400'}`}>
                       <p className="font-mono text-2xl">{round.opponent}</p>
                       <p className="font-mono text-xs">{shortenAddress(game.opponent!)}</p>
@@ -333,9 +513,7 @@ export function ShadowDuel({ gameId, onBack }: ShadowDuelProps) {
                   <div className="text-center text-stone-600">
                     <p className="font-mono text-2xl">?</p>
                   </div>
-                  <div className="text-center text-stone-600 font-mono">
-                    VS
-                  </div>
+                  <div className="text-center text-stone-600 font-mono">VS</div>
                   <div className="text-center text-stone-600">
                     <p className="font-mono text-2xl">?</p>
                   </div>
@@ -360,15 +538,15 @@ export function ShadowDuel({ gameId, onBack }: ShadowDuelProps) {
       {game.status === 'completed' && (
         <div className="text-center">
           <div className="border border-stone-600 bg-stone-800/50 p-6 mb-6">
-            {game.winner === publicKey.toString() ? (
+            {game.winner === publicKey?.toString() ? (
               <>
                 <p className="font-serif text-3xl text-green-500 mb-2">VICTORY</p>
-                <p className="text-stone-400 font-mono">You claimed {formatStake(game.stake * 2)} SOL</p>
+                <p className="text-stone-400 font-mono">You won {formatStake(game.stake * 2)} SOL</p>
               </>
             ) : (
               <>
                 <p className="font-serif text-3xl text-red-500 mb-2">DEFEAT</p>
-                <p className="text-stone-400 font-mono">Your opponent claims the pot</p>
+                <p className="text-stone-400 font-mono">Opponent takes the pot</p>
               </>
             )}
           </div>
@@ -391,6 +569,12 @@ export function ShadowDuel({ gameId, onBack }: ShadowDuelProps) {
             })}
           </div>
 
+          <div className="border border-green-900/50 bg-green-900/20 p-3 mb-6">
+            <p className="text-green-400 font-mono text-xs">
+              VERIFIED: All allocations cryptographically proven via commit-reveal
+            </p>
+          </div>
+
           <button
             onClick={onBack}
             className="w-full border border-stone-600 text-stone-300 py-3 font-mono hover:bg-stone-800 transition-colors"
@@ -399,7 +583,10 @@ export function ShadowDuel({ gameId, onBack }: ShadowDuelProps) {
           </button>
         </div>
       )}
+
+      {error && game.status !== 'committing' && game.status !== 'revealing' && (
+        <p className="text-red-400 font-mono text-sm mt-4">{error}</p>
+      )}
     </div>
   );
 }
-
