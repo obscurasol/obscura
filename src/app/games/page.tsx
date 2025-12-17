@@ -61,9 +61,20 @@ export default function GamesPage() {
         {!publicKey && (
           <div className="border border-stone-700 bg-stone-900/50 p-8 text-center mb-8">
             <p className="text-stone-400 font-mono mb-4">Connect your wallet to play</p>
-            <div className="flex justify-center">
+            <div className="flex justify-center mb-4">
               <WalletMultiButton />
             </div>
+            <p className="text-stone-600 font-mono text-xs">
+              Need a wallet?{' '}
+              <a 
+                href="https://phantom.app" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-stone-500 hover:text-stone-400 underline"
+              >
+                Get Phantom
+              </a>
+            </p>
           </div>
         )}
 

@@ -26,6 +26,12 @@ export default function DocsPage() {
             </div>
 
             <div className="flex items-center gap-4">
+              <Link 
+                href="/games"
+                className="text-sm text-[#58586a] hover:text-[#9898a8] transition-colors"
+              >
+                Games
+              </Link>
               <a 
                 href="https://x.com/obscura_arc" 
                 target="_blank" 
@@ -67,8 +73,9 @@ export default function DocsPage() {
                 { id: "getting-started", title: "II. Getting Started" },
                 { id: "how-it-works", title: "III. How It Works" },
                 { id: "making-transfer", title: "IV. Making a Transfer" },
-                { id: "security", title: "V. Security" },
-                { id: "faq", title: "VI. FAQ" },
+                { id: "shadow-duel", title: "V. Shadow Duel Game" },
+                { id: "security", title: "VI. Security" },
+                { id: "faq", title: "VII. FAQ" },
               ].map((item) => (
                 <a 
                   key={item.id}
@@ -219,11 +226,77 @@ export default function DocsPage() {
               </div>
             </section>
 
+            {/* Shadow Duel Game */}
+            <section id="shadow-duel" className="animate-fade-up" style={{ animationDelay: "0.55s" }}>
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-10 h-10 rounded-xl bg-[#16161c] flex items-center justify-center">
+                  <span className="text-sm font-medium text-[#58586a]">V</span>
+                </div>
+                <h2 className="text-2xl font-medium text-[#e8e8ed]">Shadow Duel Game</h2>
+              </div>
+              <div className="glass-card p-8">
+                <div className="prose prose-invert max-w-none">
+                  <p className="text-[#9898a8] leading-relaxed mb-6">
+                    Shadow Duel is the first onchain game with truly hidden state, powered by Arcium's encrypted compute. 
+                    It's a strategic 3-round allocation game where your choices remain hidden until the dramatic reveal.
+                  </p>
+                  
+                  <h4 className="text-[#e8e8ed] font-medium mb-4">Game Overview</h4>
+                  <p className="text-[#9898a8] leading-relaxed mb-6">
+                    Two players stake SOL and secretly allocate 10 power points across 3 rounds. 
+                    Neither player can see the other's allocation. Rounds reveal one-by-one, 
+                    and whoever wins 2 out of 3 rounds takes the entire pot.
+                  </p>
+
+                  <h4 className="text-[#e8e8ed] font-medium mb-4">How to Play</h4>
+                  <div className="space-y-4 mb-6">
+                    <div className="p-4 bg-[#0c0c10] rounded-xl border border-[#1c1c24]">
+                      <p className="text-[#58586a] text-xs uppercase tracking-wider mb-2">Step I - Create or Join</p>
+                      <p className="text-[#9898a8] text-sm">Create a new duel by setting your stake amount, or join an existing game from the lobby. Your opponent must match your stake.</p>
+                    </div>
+                    <div className="p-4 bg-[#0c0c10] rounded-xl border border-[#1c1c24]">
+                      <p className="text-[#58586a] text-xs uppercase tracking-wider mb-2">Step II - Allocate Power</p>
+                      <p className="text-[#9898a8] text-sm">Distribute exactly 10 power points across Round I, II, and III. Your allocation is encrypted and hidden from your opponent. Strategy matters - do you go aggressive early or save for later rounds?</p>
+                    </div>
+                    <div className="p-4 bg-[#0c0c10] rounded-xl border border-[#1c1c24]">
+                      <p className="text-[#58586a] text-xs uppercase tracking-wider mb-2">Step III - The Reveal</p>
+                      <p className="text-[#9898a8] text-sm">Once both players lock in their allocations, rounds reveal one at a time. Higher power wins each round. Best of 3 takes the pot.</p>
+                    </div>
+                  </div>
+
+                  <h4 className="text-[#e8e8ed] font-medium mb-4">Example Game</h4>
+                  <div className="p-4 bg-[#0c0c10] rounded-xl border border-[#1c1c24] font-mono text-sm mb-6">
+                    <p className="text-[#58586a] mb-2">Your allocation:     [7] [2] [1] = 10</p>
+                    <p className="text-[#58586a] mb-4">Opponent allocation: [3] [3] [4] = 10</p>
+                    <p className="text-[#9898a8]">Round I:   7 vs 3  = You win</p>
+                    <p className="text-[#9898a8]">Round II:  2 vs 3  = They win</p>
+                    <p className="text-[#9898a8]">Round III: 1 vs 4  = They win</p>
+                    <p className="text-[#e8e8ed] mt-2">Result: Opponent wins 2-1</p>
+                  </div>
+
+                  <h4 className="text-[#e8e8ed] font-medium mb-4">Strategy Tips</h4>
+                  <ul className="space-y-2 text-[#9898a8]">
+                    <li><span className="text-[#e8e8ed]">Aggressive:</span> Go heavy on Round I (e.g., 6-2-2) to take an early lead</li>
+                    <li><span className="text-[#e8e8ed]">Balanced:</span> Spread evenly (3-3-4) to stay competitive in all rounds</li>
+                    <li><span className="text-[#e8e8ed]">Sandbagging:</span> Sacrifice Round I (1-4-5) to dominate later rounds</li>
+                    <li><span className="text-[#e8e8ed]">Mind Games:</span> Your opponent can't see your allocation - use this to your advantage</li>
+                  </ul>
+
+                  <h4 className="text-[#e8e8ed] font-medium mt-6 mb-4">Why Hidden State Matters</h4>
+                  <p className="text-[#9898a8] leading-relaxed">
+                    On traditional blockchains, all game state is public - opponents could see your moves before acting. 
+                    Shadow Duel uses Arcium's encrypted compute to keep allocations truly hidden until reveal time. 
+                    This enables real strategic gameplay that was previously impossible onchain.
+                  </p>
+                </div>
+              </div>
+            </section>
+
             {/* Security */}
             <section id="security" className="animate-fade-up" style={{ animationDelay: "0.6s" }}>
               <div className="flex items-center gap-4 mb-6">
                 <div className="w-10 h-10 rounded-xl bg-[#16161c] flex items-center justify-center">
-                  <span className="text-sm font-medium text-[#58586a]">V</span>
+                  <span className="text-sm font-medium text-[#58586a]">VI</span>
                 </div>
                 <h2 className="text-2xl font-medium text-[#e8e8ed]">Security</h2>
               </div>
@@ -251,7 +324,7 @@ export default function DocsPage() {
             <section id="faq" className="animate-fade-up" style={{ animationDelay: "0.7s" }}>
               <div className="flex items-center gap-4 mb-6">
                 <div className="w-10 h-10 rounded-xl bg-[#16161c] flex items-center justify-center">
-                  <span className="text-sm font-medium text-[#58586a]">VI</span>
+                  <span className="text-sm font-medium text-[#58586a]">VII</span>
                 </div>
                 <h2 className="text-2xl font-medium text-[#e8e8ed]">FAQ</h2>
               </div>
@@ -276,6 +349,14 @@ export default function DocsPage() {
                   {
                     q: "How do I get Devnet SOL?",
                     a: "Connect your wallet to the app and click 'Request Devnet SOL' to receive free test tokens."
+                  },
+                  {
+                    q: "How does Shadow Duel work?",
+                    a: "Shadow Duel is a 3-round strategic game. Both players secretly allocate 10 power points across 3 rounds. Allocations are encrypted until reveal. Winner of 2 out of 3 rounds takes the pot."
+                  },
+                  {
+                    q: "Is Shadow Duel fair?",
+                    a: "Yes. Arcium's MPC ensures neither player can see the other's allocation until both have committed. The reveal happens on-chain with cryptographic guarantees."
                   },
                 ].map((faq, i) => (
                   <div key={i} className="glass-card p-6">
@@ -313,6 +394,7 @@ export default function DocsPage() {
           
           <div className="flex items-center gap-6 text-sm text-[#58586a]">
             <Link href="/" className="hover:text-[#9898a8] transition-colors">Home</Link>
+            <Link href="/games" className="hover:text-[#9898a8] transition-colors">Games</Link>
             <a href="https://x.com/obscura_arc" target="_blank" rel="noopener noreferrer" className="hover:text-[#9898a8] transition-colors">
               Twitter
             </a>
