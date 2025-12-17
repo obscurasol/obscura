@@ -660,7 +660,12 @@ export function ShadowDuel({ gameId, onBack }: ShadowDuelProps) {
       {game.status === 'completed' && (
         <div className="text-center">
           <div className="border border-stone-600 bg-stone-800/50 p-6 mb-6">
-            {game.winner === publicKey?.toString() ? (
+            {game.winner === 'tie' ? (
+              <>
+                <p className="font-serif text-3xl text-yellow-500 mb-2">DRAW</p>
+                <p className="text-stone-400 font-mono">Stakes returned to both players</p>
+              </>
+            ) : game.winner === publicKey?.toString() ? (
               <>
                 <p className="font-serif text-3xl text-green-500 mb-2">VICTORY</p>
                 <p className="text-stone-400 font-mono">You won {formatStake(game.stake * 2)} SOL</p>
