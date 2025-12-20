@@ -20,7 +20,7 @@ export const SendForm: FC = () => {
   const [errorMessage, setErrorMessage] = useState("");
   const [showContacts, setShowContacts] = useState(false);
   const [txSignature, setTxSignature] = useState("");
-  const [encryptionProof, setEncryptionProof] = useState<{ publicKey: string; nonce: string; ciphertextHash: string } | null>(null);
+  const [encryptionProof, setEncryptionProof] = useState<{ publicKey: string; nonce: string; ciphertextHash: string; method?: string } | null>(null);
   
   // Get encryption status
   const encryptionStatus = getEncryptionStatus();
@@ -291,6 +291,11 @@ export const SendForm: FC = () => {
             {encryptionProof && (
               <div className="pt-3 border-t border-emerald-500/20 space-y-1">
                 <p className="text-xs text-emerald-400/80 font-medium mb-2">Encryption Proof</p>
+                {encryptionProof.method && (
+                  <p className="text-xs text-emerald-400/60 mb-1">
+                    Method: {encryptionProof.method}
+                  </p>
+                )}
                 <p className="text-xs text-emerald-400/60 font-mono">
                   Key: {encryptionProof.publicKey.slice(0, 24)}...
                 </p>
