@@ -21,8 +21,11 @@ jobs:
 
       - name: Setup Arcium
         uses: arcium-hq/setup-arcium@v0.5.1
+        with:
+          runner-arch-os: x86_64_linux
 
       - name: Build Arcis Program
+        shell: bash
         run: |
           cd arcis
           arcium build
@@ -45,6 +48,8 @@ jobs:
 
       - name: Setup Arcium
         uses: arcium-hq/setup-arcium@v0.5.1
+        with:
+          runner-arch-os: x86_64_linux
 
       - name: Download Artifacts
         uses: actions/download-artifact@v4
@@ -53,6 +58,7 @@ jobs:
           path: arcis/target/
 
       - name: Deploy to Testnet
+        shell: bash
         env:
           ARCIUM_KEYPAIR: ${{ secrets.ARCIUM_KEYPAIR }}
         run: |
@@ -64,4 +70,3 @@ jobs:
           else
             echo "ARCIUM_KEYPAIR secret not set, skipping deployment"
           fi
-
