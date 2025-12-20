@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'arcis/**'
+      - '.github/workflows/build-arcis.yml'
   pull_request:
     branches: [main]
     paths:
@@ -24,9 +25,23 @@ jobs:
         with:
           runner-arch-os: x86_64_linux
 
+      - name: Debug PATH
+        shell: bash
+        run: |
+          echo "PATH: $PATH"
+          echo "HOME: $HOME"
+          ls -la $HOME/.arcup 2>/dev/null || echo "No .arcup directory"
+          ls -la $HOME/.local/share/arcup 2>/dev/null || echo "No .local/share/arcup"
+          which arcium || echo "arcium not in PATH"
+          which arcup || echo "arcup not in PATH"
+
       - name: Build Arcis Program
         shell: bash
         run: |
+          # Source arcup if needed
+          if [ -f "$HOME/.arcup/env" ]; then
+            source "$HOME/.arcup/env"
+          fi
           cd arcis
           arcium build
 
