@@ -4,7 +4,7 @@ import { FC, useState, useCallback, useEffect } from "react";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { useStore } from "@/store/useStore";
-import { executeConfidentialTransfer, requestAirdrop, getBalance } from "@/lib/arcium";
+import { executeConfidentialTransfer, requestAirdrop, getBalance, getEncryptionStatus } from "@/lib/arcium";
 
 export const SendForm: FC = () => {
   const { publicKey, signTransaction } = useWallet();
@@ -20,6 +20,10 @@ export const SendForm: FC = () => {
   const [errorMessage, setErrorMessage] = useState("");
   const [showContacts, setShowContacts] = useState(false);
   const [txSignature, setTxSignature] = useState("");
+  const [encryptionProof, setEncryptionProof] = useState<{ publicKey: string; nonce: string; ciphertextHash: string } | null>(null);
+  
+  // Get encryption status
+  const encryptionStatus = getEncryptionStatus();
 
   useEffect(() => {
     if (publicKey && connection) {
@@ -97,6 +101,7 @@ export const SendForm: FC = () => {
       if (result.success && result.signature) {
         setStatus("success");
         setTxSignature(result.signature);
+        setEncryptionProof(result.encryptionProof || null);
         
         addTransaction({
           signature: result.signature,
@@ -116,7 +121,8 @@ export const SendForm: FC = () => {
           setRecipient("");
           setAmount("");
           setStatus("idle");
-        }, 5000);
+          setEncryptionProof(null);
+        }, 8000);
       } else {
         setStatus("error");
         setErrorMessage(result.error || "Transfer failed");
@@ -240,17 +246,32 @@ export const SendForm: FC = () => {
           </button>
         </div>
 
-        {/* Privacy info */}
+        {/* Privacy info with Arcium status */}
         <div className="py-5 px-6 bg-[#0a0a0f]/80 rounded-xl border border-[#1a1a25]">
           <div className="flex items-start gap-4">
             <div className="w-8 h-8 rounded-lg bg-[#151520] flex items-center justify-center flex-shrink-0 mt-0.5">
               <span className="text-xs font-medium text-[#58586a]">i</span>
             </div>
             <div>
-              <p className="text-sm text-[#9898a8] font-medium mb-1">Encrypted Transfer</p>
-              <p className="text-xs text-[#58586a] leading-relaxed">
-                Amount will be encrypted. Only you and the recipient can see the value.
+              <p className="text-sm text-[#9898a8] font-medium mb-1">Arcium MPC Encryption</p>
+              <p className="text-xs text-[#58586a] leading-relaxed mb-2">
+                Amount encrypted via Arcium SDK using X25519 key exchange and Rescue cipher.
               </p>
+              <div className="flex items-center gap-3">
+                <span className={`inline-flex items-center gap-1.5 text-xs px-2 py-1 rounded ${
+                  encryptionStatus.enabled 
+                    ? 'bg-emerald-500/10 text-emerald-400' 
+                    : 'bg-red-500/10 text-red-400'
+                }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${
+                    encryptionStatus.enabled ? 'bg-emerald-400' : 'bg-red-400'
+                  }`} />
+                  {encryptionStatus.enabled ? 'Encryption Active' : 'Encryption Disabled'}
+                </span>
+                <span className="text-xs text-[#58586a]">
+                  Network: {encryptionStatus.network}
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -263,10 +284,24 @@ export const SendForm: FC = () => {
               href={`https://explorer.solana.com/tx/${txSignature}?cluster=devnet`}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs text-emerald-400/70 hover:text-emerald-400 font-mono transition-colors"
+              className="text-xs text-emerald-400/70 hover:text-emerald-400 font-mono transition-colors block mb-3"
             >
               View on Explorer
             </a>
+            {encryptionProof && (
+              <div className="pt-3 border-t border-emerald-500/20 space-y-1">
+                <p className="text-xs text-emerald-400/80 font-medium mb-2">Encryption Proof</p>
+                <p className="text-xs text-emerald-400/60 font-mono">
+                  Key: {encryptionProof.publicKey.slice(0, 24)}...
+                </p>
+                <p className="text-xs text-emerald-400/60 font-mono">
+                  Nonce: {encryptionProof.nonce.slice(0, 16)}...
+                </p>
+                <p className="text-xs text-emerald-400/60 font-mono">
+                  Hash: {encryptionProof.ciphertextHash}
+                </p>
+              </div>
+            )}
           </div>
         )}
 

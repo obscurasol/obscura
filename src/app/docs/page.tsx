@@ -163,30 +163,37 @@ export default function DocsPage() {
               <div className="glass-card p-8">
                 <div className="prose prose-invert max-w-none">
                   <p className="text-[#9898a8] leading-relaxed mb-6">
-                    Obscura uses the Arcium Network's Multi-Party Computation (MPC) technology to encrypt transaction amounts before they are broadcast to the Solana blockchain.
+                    Obscura uses the Arcium Network's Multi-Party Computation (MPC) technology to encrypt transaction amounts. We integrate the official <code className="text-[#e8e8ed] bg-[#1c1c24] px-1.5 py-0.5 rounded">@arcium-hq/client</code> SDK for cryptographic operations.
                   </p>
+
+                  <h4 className="text-[#e8e8ed] font-medium mb-4">Arcium SDK Integration</h4>
+                  <div className="p-4 bg-[#0c0c10] rounded-xl border border-[#1c1c24] mb-6">
+                    <p className="text-[#9898a8] text-sm leading-relaxed">
+                      The Arcium Client SDK provides X25519 key exchange and Rescue cipher for secure encryption. When you make a transfer, your amount is encrypted client-side using a shared secret derived from your keypair and the Arcium MXE public key.
+                    </p>
+                  </div>
                   
                   <h4 className="text-[#e8e8ed] font-medium mb-4">The Process</h4>
                   <div className="space-y-4">
                     <div className="p-4 bg-[#0c0c10] rounded-xl border border-[#1c1c24]">
                       <p className="text-[#58586a] text-xs uppercase tracking-wider mb-2">Step I</p>
-                      <p className="text-[#e8e8ed] font-medium mb-1">Amount Encryption</p>
-                      <p className="text-[#9898a8] text-sm">Your transaction amount is encrypted using MPC protocols before leaving your device.</p>
+                      <p className="text-[#e8e8ed] font-medium mb-1">Key Exchange</p>
+                      <p className="text-[#9898a8] text-sm">A session X25519 keypair is generated. The shared secret is computed with the Arcium MXE public key.</p>
                     </div>
                     <div className="p-4 bg-[#0c0c10] rounded-xl border border-[#1c1c24]">
                       <p className="text-[#58586a] text-xs uppercase tracking-wider mb-2">Step II</p>
-                      <p className="text-[#e8e8ed] font-medium mb-1">Transaction Creation</p>
-                      <p className="text-[#9898a8] text-sm">A Solana transaction is created with the encrypted amount data.</p>
+                      <p className="text-[#e8e8ed] font-medium mb-1">Amount Encryption</p>
+                      <p className="text-[#9898a8] text-sm">Your amount is encrypted using the Rescue cipher with a random 16-byte nonce.</p>
                     </div>
                     <div className="p-4 bg-[#0c0c10] rounded-xl border border-[#1c1c24]">
                       <p className="text-[#58586a] text-xs uppercase tracking-wider mb-2">Step III</p>
-                      <p className="text-[#e8e8ed] font-medium mb-1">Broadcast & Confirmation</p>
-                      <p className="text-[#9898a8] text-sm">The transaction is sent to Solana for confirmation. The amount remains encrypted on-chain.</p>
+                      <p className="text-[#e8e8ed] font-medium mb-1">Transaction Creation</p>
+                      <p className="text-[#9898a8] text-sm">A Solana transaction is created with the encrypted amount data and your public key.</p>
                     </div>
                     <div className="p-4 bg-[#0c0c10] rounded-xl border border-[#1c1c24]">
                       <p className="text-[#58586a] text-xs uppercase tracking-wider mb-2">Step IV</p>
-                      <p className="text-[#e8e8ed] font-medium mb-1">Recipient Decryption</p>
-                      <p className="text-[#9898a8] text-sm">Only the recipient can decrypt and access the transferred amount.</p>
+                      <p className="text-[#e8e8ed] font-medium mb-1">Broadcast & Proof</p>
+                      <p className="text-[#9898a8] text-sm">The transaction is sent to Solana. An encryption proof (key, nonce, hash) is displayed for verification.</p>
                     </div>
                   </div>
                 </div>
