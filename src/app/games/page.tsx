@@ -13,6 +13,12 @@ export default function GamesPage() {
   const [selectedGameId, setSelectedGameId] = useState<string | undefined>();
   const [joinId, setJoinId] = useState('');
   const [joinError, setJoinError] = useState('');
+  const [mounted, setMounted] = useState(false);
+
+  // Prevent hydration mismatch
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Firebase hooks for real-time game sync
   const { games, isConnected, error: firebaseError, getOpenGames, getPlayerGames } = useFirebaseGames();
@@ -100,7 +106,7 @@ export default function GamesPage() {
         </div>
 
         {/* Wallet Connection */}
-        {!publicKey && (
+        {mounted && !publicKey && (
           <div className="border border-stone-700 bg-stone-900/50 p-8 text-center mb-8">
             <p className="text-stone-400 font-mono mb-4">Connect your wallet to play</p>
             <div className="flex justify-center mb-4">
@@ -154,7 +160,7 @@ export default function GamesPage() {
             </div>
 
             {/* Create Game Button */}
-            {publicKey && (
+            {mounted && publicKey && (
               <button
                 onClick={handleCreateGame}
                 className="w-full bg-stone-100 text-stone-900 py-4 font-mono text-lg hover:bg-stone-200 transition-colors mb-4"
@@ -164,7 +170,7 @@ export default function GamesPage() {
             )}
 
             {/* Join by ID */}
-            {publicKey && (
+            {mounted && publicKey && (
               <div className="border border-stone-700 bg-stone-900/50 p-4 mb-8">
                 <p className="text-stone-400 font-mono text-sm mb-3">Join Existing Duel</p>
                 <div className="flex gap-2">
@@ -197,7 +203,7 @@ export default function GamesPage() {
             )}
 
             {/* My Active Games */}
-            {publicKey && myGames.filter(g => g.status !== 'completed').length > 0 && (
+            {mounted && publicKey && myGames.filter(g => g.status !== 'completed').length > 0 && (
               <div className="mb-8">
                 <h2 className="font-serif text-xl text-stone-100 mb-4">My Games</h2>
                 <div className="space-y-3">
@@ -290,7 +296,7 @@ export default function GamesPage() {
             </div>
 
             {/* Game History */}
-            {publicKey && myGames.filter(g => g.status === 'completed').length > 0 && (
+            {mounted && publicKey && myGames.filter(g => g.status === 'completed').length > 0 && (
               <div className="mt-8">
                 <h2 className="font-serif text-xl text-stone-100 mb-4">History</h2>
                 <div className="space-y-2">
