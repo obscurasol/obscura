@@ -1,4 +1,4 @@
-/// Obscura MPC - Confidential Transfer Program
+/// Obscura MPC - Confidential Transfer Program for Solana
 /// 
 /// This Arcis program enables confidential transfers on Solana using
 /// Arcium's Multi-Party Computation (MPC) network.
