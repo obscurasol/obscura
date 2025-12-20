@@ -1,0 +1,12 @@
+[package]
+name = "obscura-mpc"
+version = "0.1.0"
+description = "Arcium MPC program for confidential transfers on Solana"
+edition = "2021"
+
+[dependencies]
+arcis-imports = "0.5.1"
+
+[lib]
+crate-type = ["cdylib", "lib"]
+

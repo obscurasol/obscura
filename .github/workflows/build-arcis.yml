@@ -1,0 +1,71 @@
+name: Build Arcis MPC Program
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'arcis/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'arcis/**'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Arcium
+        uses: arcium-hq/setup-arcium@v1
+        with:
+          version: '0.5.1'
+
+      - name: Build Arcis Program
+        run: |
+          cd arcis
+          arcium build
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: obscura-mpc
+          path: arcis/target/
+          retention-days: 30
+
+  deploy-testnet:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Arcium
+        uses: arcium-hq/setup-arcium@v1
+        with:
+          version: '0.5.1'
+
+      - name: Download Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: obscura-mpc
+          path: arcis/target/
+
+      - name: Deploy to Testnet
+        env:
+          ARCIUM_KEYPAIR: ${{ secrets.ARCIUM_KEYPAIR }}
+        run: |
+          if [ -n "$ARCIUM_KEYPAIR" ]; then
+            echo "Deploying to Arcium Testnet..."
+            cd arcis
+            # arcium deploy --network testnet
+            echo "Deployment would happen here with proper keypair"
+          else
+            echo "ARCIUM_KEYPAIR secret not set, skipping deployment"
+          fi
+
