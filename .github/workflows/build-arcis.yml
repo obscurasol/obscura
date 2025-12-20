@@ -25,28 +25,37 @@ jobs:
         with:
           runner-arch-os: x86_64_linux
 
-      - name: Debug PATH
-        shell: bash
-        run: |
-          echo "PATH: $PATH"
-          echo "HOME: $HOME"
-          ls -la $HOME/.arcup 2>/dev/null || echo "No .arcup directory"
-          ls -la $HOME/.local/share/arcup 2>/dev/null || echo "No .local/share/arcup"
-          which arcium || echo "arcium not in PATH"
-          which arcup || echo "arcup not in PATH"
-
       - name: Build Arcis Program
         shell: bash
         run: |
-          # Source arcup if needed
-          if [ -f "$HOME/.arcup/env" ]; then
-            source "$HOME/.arcup/env"
+          # Add arcup to PATH (common installation locations)
+          export PATH="$HOME/.arcup/bin:$HOME/.local/share/arcup/bin:$HOME/.cargo/bin:$PATH"
+          
+          # Also try sourcing the env file if it exists
+          [ -f "$HOME/.arcup/env" ] && source "$HOME/.arcup/env"
+          [ -f "$HOME/.local/share/arcup/env" ] && source "$HOME/.local/share/arcup/env"
+          
+          # Show what we have
+          echo "PATH: $PATH"
+          echo "Looking for arcium..."
+          find $HOME -name "arcium" -type f 2>/dev/null | head -5
+          
+          # Try to find and run arcium
+          ARCIUM_BIN=$(find $HOME -name "arcium" -type f -executable 2>/dev/null | head -1)
+          if [ -n "$ARCIUM_BIN" ]; then
+            echo "Found arcium at: $ARCIUM_BIN"
+            cd arcis
+            "$ARCIUM_BIN" build
+          else
+            echo "arcium not found, listing arcup directories..."
+            ls -la $HOME/.arcup/ 2>/dev/null || echo "No .arcup"
+            ls -la $HOME/.local/share/arcup/ 2>/dev/null || echo "No .local/share/arcup"
+            exit 1
           fi
-          cd arcis
-          arcium build
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
+        if: success()
         with:
           name: obscura-mpc
           path: arcis/target/
